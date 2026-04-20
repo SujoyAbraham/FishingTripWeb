@@ -576,11 +576,7 @@ body{font-family:'Crimson Pro',Georgia,serif;color:var(--txt);background:var(--s
     </div>
     <div class="card card-pad">
       <div id="rosterList"></div>
-      <button class="add-member" onclick="addMember()">
-        <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><line x1="6.5" y1="1" x2="6.5" y2="12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="1" y1="6.5" x2="12" y2="6.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-        Add Member
-      </button>
-      <div class="confirmed-bar" id="confirmedBar">0 of 4 confirmed for May 2, 2026</div>
+      <div class="confirmed-bar" id="confirmedBar">0 of 0 confirmed for May 2, 2026</div>
     </div>
   </div>
 
@@ -603,12 +599,7 @@ body{font-family:'Crimson Pro',Georgia,serif;color:var(--txt);background:var(--s
 
 </div><!-- /page -->
 
-<div class="footer">
-  Weekend Fishing Group &nbsp;·&nbsp; Drexel Hill, PA &nbsp;·&nbsp; Built for the crew
-  <div style="margin-top:6px;font-size:.65rem">
-    Data store: <span id="syncBadge" style="font-weight:600;color:#6a85a8">Local only</span>
-  </div>
-</div>
+<div class="footer">Weekend Fishing Group &nbsp;·&nbsp; Drexel Hill, PA &nbsp;·&nbsp; Built for the crew</div>
 
 <!-- REAL-TIME WEATHER WIDGET -->
 <div class="wx-widget" id="wxWidget">
@@ -637,160 +628,67 @@ body{font-family:'Crimson Pro',Georgia,serif;color:var(--txt);background:var(--s
 
 <script>
 // ══════════════════════════════════════════
-//  CLOUD CONFIG  ← paste your JSONBin credentials here
-//  1. Sign up free at https://jsonbin.io
-//  2. Dashboard → API Keys → copy your Master Key
-//  3. Create a Bin (Content: {}) → copy the Bin ID
-// ══════════════════════════════════════════
-const CLOUD_BIN_ID  = '';   // e.g. '6641a2f9acd3cb34a83e1234'
-const CLOUD_API_KEY = '';   // e.g. '$2a$10$abcdefg...'
-
-// ══════════════════════════════════════════
-//  CLOUD SYNC
-// ══════════════════════════════════════════
-const Cloud = {
-  get ok()      { return !!(CLOUD_BIN_ID && CLOUD_API_KEY); },
-  get url()     { return `https://api.jsonbin.io/v3/b/${CLOUD_BIN_ID}`; },
-  get headers() { return {'Content-Type':'application/json','X-Master-Key':CLOUD_API_KEY,'X-Bin-Versioning':'false'}; },
-  _timer: null,
-
-  async pull() {
-    if (!this.ok) return null;
-    try {
-      const r = await fetch(this.url+'/latest', {headers:this.headers});
-      if (!r.ok) return null;
-      return (await r.json()).record;
-    } catch { return null; }
-  },
-
-  async push(data) {
-    if (!this.ok) return;
-    try {
-      await fetch(this.url, {method:'PUT', headers:this.headers, body:JSON.stringify(data)});
-      setSyncBadge('saved');
-    } catch { setSyncBadge('error'); }
-  },
-
-  /* debounce writes — waits 800ms after last change before pushing */
-  schedule(data) {
-    clearTimeout(this._timer);
-    setSyncBadge('saving');
-    this._timer = setTimeout(()=>this.push(data), 800);
-  },
-};
-
-function setSyncBadge(state) {
-  const el = document.getElementById('syncBadge');
-  if (!el) return;
-  const map = {
-    loading:{'txt':'Syncing…',  'col':'#3a7ab8'},
-    saving: {'txt':'Saving…',   'col':'#b86f10'},
-    saved:  {'txt':'✓ Synced',  'col':'#2a7a4a'},
-    error:  {'txt':'Sync error','col':'#c03030'},
-    local:  {'txt':'Local only','col':'#6a85a8'},
-  };
-  const s = map[state]||map.local;
-  el.textContent = s.txt;
-  el.style.color = s.col;
-}
-
-// ══════════════════════════════════════════
 //  CENTRAL DATA STORE
+//  Member names come from data.json (edit that file & push to update).
+//  RSVP state and checklist are saved per-device in localStorage.
 // ══════════════════════════════════════════
 const DB = {
 
-  /* ── defaults ── */
-  _defaults: {
-    members: [
-      {id:1,name:'Member 1',rsvp:null},
-      {id:2,name:'Member 2',rsvp:null},
-      {id:3,name:'Member 3',rsvp:null},
-      {id:4,name:'Member 4',rsvp:null},
-    ],
-    categories: [
-      {cat:'Rods & Reels',     items:['Spinning rod','Baitcasting rod','Spare rod','Rod holders','Reel oil']},
-      {cat:'Tackle Box',       items:['Hooks (assorted)','Sinkers','Bobbers','Soft plastic lures','Hard lures','Swivels & snaps','Extra line']},
-      {cat:'Bait & Landing',   items:['Live bait container','Powerbait (trout)','Worms','Landing net','Bait bucket','Stringer']},
-      {cat:'Clothing & Safety',items:['Life jacket','First aid kit','Sun hat','Rain jacket','Sunscreen SPF 50','Polarized sunglasses','Waders']},
-      {cat:'Food & Drinks',    items:['Cooler with ice','Water (2L/person)','Coffee thermos','Snacks','Packed lunch','Trash bags']},
-      {cat:'Licenses & Docs',  items:['PA fishing license (each member)','Regulation booklet','Park/access permit','Emergency contacts']},
-    ],
-  },
+  /* ── defaults (checklist categories) ── */
+  _defaultCategories: [
+    {cat:'Rods & Reels',     items:['Spinning rod','Baitcasting rod','Spare rod','Rod holders','Reel oil']},
+    {cat:'Tackle Box',       items:['Hooks (assorted)','Sinkers','Bobbers','Soft plastic lures','Hard lures','Swivels & snaps','Extra line']},
+    {cat:'Bait & Landing',   items:['Live bait container','Powerbait (trout)','Worms','Landing net','Bait bucket','Stringer']},
+    {cat:'Clothing & Safety',items:['Life jacket','First aid kit','Sun hat','Rain jacket','Sunscreen SPF 50','Polarized sunglasses','Waders']},
+    {cat:'Food & Drinks',    items:['Cooler with ice','Water (2L/person)','Coffee thermos','Snacks','Packed lunch','Trash bags']},
+    {cat:'Licenses & Docs',  items:['PA fishing license (each member)','Regulation booklet','Park/access permit','Emergency contacts']},
+  ],
 
   /* ── live state ── */
   members:    [],
   categories: [],
   checked:    {},
-  _nextId:    5,
 
-  _applyRecord(s) {
-    this.members    = s.members    || JSON.parse(JSON.stringify(this._defaults.members));
-    this.categories = s.categories || JSON.parse(JSON.stringify(this._defaults.categories));
-    this.checked    = s.checked    || {};
-    this._nextId    = s._nextId    || (this.members.length + 1);
-  },
-
-  _snapshot() {
-    return {members:this.members, categories:this.categories, checked:this.checked, _nextId:this._nextId};
-  },
-
-  /* write to localStorage + schedule cloud push */
-  save() {
-    const snap = this._snapshot();
-    localStorage.setItem('wfg_db', JSON.stringify(snap));
-    Cloud.schedule(snap);
-  },
-
-  /* load: cloud first, fall back to localStorage cache */
+  /* fetch member names from data.json, merge saved RSVP states */
   async load() {
-    if (Cloud.ok) {
-      setSyncBadge('loading');
-      const remote = await Cloud.pull();
-      if (remote && remote.members) {
-        this._applyRecord(remote);
-        localStorage.setItem('wfg_db', JSON.stringify(this._snapshot()));
-        setSyncBadge('saved');
-        return;
-      }
-    }
-    /* fall back to local cache */
-    const raw = localStorage.getItem('wfg_db');
-    if (raw) { this._applyRecord(JSON.parse(raw)); }
-    else {
-      const lr = localStorage.getItem('wfg_roster');
-      const lc = localStorage.getItem('wfg_checklist');
-      this.members    = lr ? JSON.parse(lr).map((m,i)=>({id:i+1,...m}))
-                          : JSON.parse(JSON.stringify(this._defaults.members));
-      this.categories = JSON.parse(JSON.stringify(this._defaults.categories));
-      this.checked    = lc ? JSON.parse(lc) : {};
-      this._nextId    = this.members.length + 1;
-      localStorage.removeItem('wfg_roster');
-      localStorage.removeItem('wfg_checklist');
-    }
-    setSyncBadge(Cloud.ok ? 'error' : 'local');
+    /* 1. load checklist categories (static) */
+    this.categories = this._defaultCategories;
+
+    /* 2. load checklist checked state from localStorage */
+    this.checked = JSON.parse(localStorage.getItem('wfg_checked') || '{}');
+
+    /* 3. fetch member names from data.json */
+    let fileMembers = [];
+    try {
+      const r = await fetch('./data.json');
+      if (r.ok) fileMembers = (await r.json()).members || [];
+    } catch {}
+
+    /* 4. merge with saved RSVP states */
+    const rsvpMap = JSON.parse(localStorage.getItem('wfg_rsvp') || '{}');
+    this.members = fileMembers.map(m => ({...m, rsvp: rsvpMap[m.id] || null}));
   },
 
   /* ── member ops ── */
-  addMember(name) {
-    this.members.push({id:this._nextId++, name:name||'New Member', rsvp:null});
-    this.save();
-  },
-  removeMember(id) {
-    this.members = this.members.filter(m=>m.id!==id);
-    this.save();
-  },
-  updateMember(id, patch) {
-    const m = this.members.find(m=>m.id===id);
-    if (m) { Object.assign(m, patch); this.save(); }
+  setRsvp(id, val) {
+    const m = this.members.find(m => m.id === id);
+    if (!m) return;
+    m.rsvp = m.rsvp === val ? null : val;
+    const map = {};
+    this.members.forEach(m => { if (m.rsvp) map[m.id] = m.rsvp; });
+    localStorage.setItem('wfg_rsvp', JSON.stringify(map));
   },
 
   /* ── checklist ops ── */
   setChecked(cat, item, val) {
     if (val) this.checked[cat+'::'+item] = true;
     else     delete this.checked[cat+'::'+item];
-    this.save();
+    localStorage.setItem('wfg_checked', JSON.stringify(this.checked));
   },
-  resetChecked() { this.checked = {}; this.save(); },
+  resetChecked() {
+    this.checked = {};
+    localStorage.setItem('wfg_checked', '{}');
+  },
 };
 
 // ── TRIP CONSTANTS ────────────────────────────────
@@ -981,25 +879,16 @@ function renderRoster(){
   DB.members.forEach(m=>{
     const row=document.createElement('div');row.className='member-row';
     row.innerHTML=`<div class="avatar">${initials(m.name)}</div>
-<span class="m-name" contenteditable="true" onblur="renameMember(${m.id},this.textContent)">${m.name}</span>
+<span class="m-name">${m.name}</span>
 <div class="rsvp-wrap">
   <button class="rsvp${m.rsvp==='in'?' in':''}" onclick="setRsvp(${m.id},'in')">In</button>
   <button class="rsvp${m.rsvp==='out'?' out':''}" onclick="setRsvp(${m.id},'out')">Out</button>
-  <button class="rsvp" style="padding:5px 8px;color:#c03030;border-color:rgba(180,40,40,.35)" onclick="removeMember(${m.id})" title="Remove">✕</button>
 </div>`;
     list.appendChild(row);
   });
   document.getElementById('confirmedBar').textContent=DB.members.filter(m=>m.rsvp==='in').length+' of '+DB.members.length+' confirmed for May 2, 2026';
 }
-function setRsvp(id,v){const m=DB.members.find(m=>m.id===id);if(m)DB.updateMember(id,{rsvp:m.rsvp===v?null:v});renderRoster();}
-function renameMember(id,n){DB.updateMember(id,{name:n.trim()||'Member'});renderRoster();}
-function removeMember(id){if(DB.members.length<=1)return;DB.removeMember(id);renderRoster();}
-function addMember(){
-  DB.addMember('New Member');renderRoster();
-  const rows=document.querySelectorAll('.member-row');
-  const sp=rows[rows.length-1].querySelector('.m-name');
-  sp.focus();document.execCommand('selectAll',false,null);
-}
+function setRsvp(id,v){DB.setRsvp(id,v);renderRoster();}
 
 // ── CHECKLIST ─────────────────────────────────────
 function resetChecklist(){if(!confirm('Reset all checklist items?'))return;DB.resetChecked();renderChecklist();}
@@ -1092,15 +981,6 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   loadWeather();
   setInterval(loadWeather, 600000);
   setInterval(renderTimeline, 60000);
-  /* auto-refresh from cloud every 60s so all devices stay in sync */
-  if (Cloud.ok) setInterval(async ()=>{
-    const remote = await Cloud.pull();
-    if (!remote) return;
-    DB._applyRecord(remote);
-    localStorage.setItem('wfg_db', JSON.stringify(DB._snapshot()));
-    renderRoster(); renderChecklist();
-    setSyncBadge('saved');
-  }, 60000);
 });
 </script>
 </body>
