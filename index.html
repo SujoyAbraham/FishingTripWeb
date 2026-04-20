@@ -603,7 +603,12 @@ body{font-family:'Crimson Pro',Georgia,serif;color:var(--txt);background:var(--s
 
 </div><!-- /page -->
 
-<div class="footer">Weekend Fishing Group &nbsp;·&nbsp; Drexel Hill, PA &nbsp;·&nbsp; Built for the crew</div>
+<div class="footer">
+  Weekend Fishing Group &nbsp;·&nbsp; Drexel Hill, PA &nbsp;·&nbsp; Built for the crew
+  <div style="margin-top:6px;font-size:.65rem">
+    Data store: <span id="syncBadge" style="font-weight:600;color:#6a85a8">Local only</span>
+  </div>
+</div>
 
 <!-- REAL-TIME WEATHER WIDGET -->
 <div class="wx-widget" id="wxWidget">
@@ -631,6 +636,64 @@ body{font-family:'Crimson Pro',Georgia,serif;color:var(--txt);background:var(--s
 </div>
 
 <script>
+// ══════════════════════════════════════════
+//  CLOUD CONFIG  ← paste your JSONBin credentials here
+//  1. Sign up free at https://jsonbin.io
+//  2. Dashboard → API Keys → copy your Master Key
+//  3. Create a Bin (Content: {}) → copy the Bin ID
+// ══════════════════════════════════════════
+const CLOUD_BIN_ID  = '';   // e.g. '6641a2f9acd3cb34a83e1234'
+const CLOUD_API_KEY = '';   // e.g. '$2a$10$abcdefg...'
+
+// ══════════════════════════════════════════
+//  CLOUD SYNC
+// ══════════════════════════════════════════
+const Cloud = {
+  get ok()      { return !!(CLOUD_BIN_ID && CLOUD_API_KEY); },
+  get url()     { return `https://api.jsonbin.io/v3/b/${CLOUD_BIN_ID}`; },
+  get headers() { return {'Content-Type':'application/json','X-Master-Key':CLOUD_API_KEY,'X-Bin-Versioning':'false'}; },
+  _timer: null,
+
+  async pull() {
+    if (!this.ok) return null;
+    try {
+      const r = await fetch(this.url+'/latest', {headers:this.headers});
+      if (!r.ok) return null;
+      return (await r.json()).record;
+    } catch { return null; }
+  },
+
+  async push(data) {
+    if (!this.ok) return;
+    try {
+      await fetch(this.url, {method:'PUT', headers:this.headers, body:JSON.stringify(data)});
+      setSyncBadge('saved');
+    } catch { setSyncBadge('error'); }
+  },
+
+  /* debounce writes — waits 800ms after last change before pushing */
+  schedule(data) {
+    clearTimeout(this._timer);
+    setSyncBadge('saving');
+    this._timer = setTimeout(()=>this.push(data), 800);
+  },
+};
+
+function setSyncBadge(state) {
+  const el = document.getElementById('syncBadge');
+  if (!el) return;
+  const map = {
+    loading:{'txt':'Syncing…',  'col':'#3a7ab8'},
+    saving: {'txt':'Saving…',   'col':'#b86f10'},
+    saved:  {'txt':'✓ Synced',  'col':'#2a7a4a'},
+    error:  {'txt':'Sync error','col':'#c03030'},
+    local:  {'txt':'Local only','col':'#6a85a8'},
+  };
+  const s = map[state]||map.local;
+  el.textContent = s.txt;
+  el.style.color = s.col;
+}
+
 // ══════════════════════════════════════════
 //  CENTRAL DATA STORE
 // ══════════════════════════════════════════
@@ -660,37 +723,51 @@ const DB = {
   checked:    {},
   _nextId:    5,
 
-  /* ── persistence ── */
-  save() {
-    localStorage.setItem('wfg_db', JSON.stringify({
-      members:    this.members,
-      categories: this.categories,
-      checked:    this.checked,
-      _nextId:    this._nextId,
-    }));
+  _applyRecord(s) {
+    this.members    = s.members    || JSON.parse(JSON.stringify(this._defaults.members));
+    this.categories = s.categories || JSON.parse(JSON.stringify(this._defaults.categories));
+    this.checked    = s.checked    || {};
+    this._nextId    = s._nextId    || (this.members.length + 1);
   },
 
-  load() {
-    const raw = localStorage.getItem('wfg_db');
-    if (raw) {
-      const s = JSON.parse(raw);
-      this.members    = s.members    || JSON.parse(JSON.stringify(this._defaults.members));
-      this.categories = s.categories || JSON.parse(JSON.stringify(this._defaults.categories));
-      this.checked    = s.checked    || {};
-      this._nextId    = s._nextId    || 5;
-      return;
+  _snapshot() {
+    return {members:this.members, categories:this.categories, checked:this.checked, _nextId:this._nextId};
+  },
+
+  /* write to localStorage + schedule cloud push */
+  save() {
+    const snap = this._snapshot();
+    localStorage.setItem('wfg_db', JSON.stringify(snap));
+    Cloud.schedule(snap);
+  },
+
+  /* load: cloud first, fall back to localStorage cache */
+  async load() {
+    if (Cloud.ok) {
+      setSyncBadge('loading');
+      const remote = await Cloud.pull();
+      if (remote && remote.members) {
+        this._applyRecord(remote);
+        localStorage.setItem('wfg_db', JSON.stringify(this._snapshot()));
+        setSyncBadge('saved');
+        return;
+      }
     }
-    // migrate legacy keys if present
-    const lr = localStorage.getItem('wfg_roster');
-    const lc = localStorage.getItem('wfg_checklist');
-    this.members    = lr ? JSON.parse(lr).map((m,i)=>({id:i+1,...m}))
-                        : JSON.parse(JSON.stringify(this._defaults.members));
-    this.categories = JSON.parse(JSON.stringify(this._defaults.categories));
-    this.checked    = lc ? JSON.parse(lc) : {};
-    this._nextId    = this.members.length + 1;
-    this.save();
-    localStorage.removeItem('wfg_roster');
-    localStorage.removeItem('wfg_checklist');
+    /* fall back to local cache */
+    const raw = localStorage.getItem('wfg_db');
+    if (raw) { this._applyRecord(JSON.parse(raw)); }
+    else {
+      const lr = localStorage.getItem('wfg_roster');
+      const lc = localStorage.getItem('wfg_checklist');
+      this.members    = lr ? JSON.parse(lr).map((m,i)=>({id:i+1,...m}))
+                          : JSON.parse(JSON.stringify(this._defaults.members));
+      this.categories = JSON.parse(JSON.stringify(this._defaults.categories));
+      this.checked    = lc ? JSON.parse(lc) : {};
+      this._nextId    = this.members.length + 1;
+      localStorage.removeItem('wfg_roster');
+      localStorage.removeItem('wfg_checklist');
+    }
+    setSyncBadge(Cloud.ok ? 'error' : 'local');
   },
 
   /* ── member ops ── */
@@ -1005,8 +1082,8 @@ async function pullRtWx(){
 }
 
 // ── INIT ──────────────────────────────────────────
-document.addEventListener('DOMContentLoaded',()=>{
-  DB.load();
+document.addEventListener('DOMContentLoaded', async ()=>{
+  await DB.load();
   initClock();
   initCountdown();
   renderTimeline();
@@ -1015,6 +1092,15 @@ document.addEventListener('DOMContentLoaded',()=>{
   loadWeather();
   setInterval(loadWeather, 600000);
   setInterval(renderTimeline, 60000);
+  /* auto-refresh from cloud every 60s so all devices stay in sync */
+  if (Cloud.ok) setInterval(async ()=>{
+    const remote = await Cloud.pull();
+    if (!remote) return;
+    DB._applyRecord(remote);
+    localStorage.setItem('wfg_db', JSON.stringify(DB._snapshot()));
+    renderRoster(); renderChecklist();
+    setSyncBadge('saved');
+  }, 60000);
 });
 </script>
 </body>
