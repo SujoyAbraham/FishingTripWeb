@@ -301,6 +301,9 @@ body{font-family:'Crimson Pro',Georgia,serif;color:var(--txt);background:var(--s
 .rsvp.in{background:var(--b4);border-color:var(--b4);color:#fff}
 .rsvp.out{background:rgba(180,40,40,.10);border-color:rgba(180,40,40,.35);color:#b03030}
 .rsvp:hover:not(.in):not(.out){background:var(--mist2);color:var(--txt)}
+.m-edit-btn{color:var(--b3)!important}
+.m-del-btn{color:#c03030!important;border-color:rgba(180,40,40,.3)!important}
+.m-name-editing{border-bottom:1.5px solid var(--b3)!important;outline:none;padding:1px 4px;border-radius:3px;background:rgba(74,122,168,.07)}
 .add-member{
   display:flex;align-items:center;gap:6px;margin-top:12px;
   padding:8px 14px;border-radius:8px;
@@ -576,6 +579,10 @@ body{font-family:'Crimson Pro',Georgia,serif;color:var(--txt);background:var(--s
     </div>
     <div class="card card-pad">
       <div id="rosterList"></div>
+      <button class="add-member" onclick="addMember()">
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><line x1="6.5" y1="1" x2="6.5" y2="12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="1" y1="6.5" x2="12" y2="6.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        Add Member
+      </button>
       <div class="confirmed-bar" id="confirmedBar">0 of 0 confirmed for May 2, 2026</div>
     </div>
   </div>
@@ -648,35 +655,53 @@ const DB = {
   members:    [],
   categories: [],
   checked:    {},
+  _nextId:    5,
 
-  /* fetch member names from data.json, merge saved RSVP states */
+  /* on first visit seeds from data.json; afterwards localStorage is source of truth */
   async load() {
-    /* 1. load checklist categories (static) */
     this.categories = this._defaultCategories;
+    this.checked    = JSON.parse(localStorage.getItem('wfg_checked') || '{}');
 
-    /* 2. load checklist checked state from localStorage */
-    this.checked = JSON.parse(localStorage.getItem('wfg_checked') || '{}');
-
-    /* 3. fetch member names from data.json */
-    let fileMembers = [];
-    try {
-      const r = await fetch('./data.json');
-      if (r.ok) fileMembers = (await r.json()).members || [];
-    } catch {}
-
-    /* 4. merge with saved RSVP states */
-    const rsvpMap = JSON.parse(localStorage.getItem('wfg_rsvp') || '{}');
-    this.members = fileMembers.map(m => ({...m, rsvp: rsvpMap[m.id] || null}));
+    const saved = localStorage.getItem('wfg_members');
+    if (saved) {
+      const s = JSON.parse(saved);
+      this.members = s.members;
+      this._nextId = s._nextId || (this.members.length + 1);
+    } else {
+      /* seed from data.json */
+      let fileMembers = [];
+      try {
+        const r = await fetch('./data.json');
+        if (r.ok) fileMembers = (await r.json()).members || [];
+      } catch {}
+      this.members = fileMembers.map(m => ({...m, rsvp: null}));
+      this._nextId = this.members.length + 1;
+      this._saveMembers();
+    }
   },
 
-  /* ── member ops ── */
+  _saveMembers() {
+    localStorage.setItem('wfg_members', JSON.stringify({members: this.members, _nextId: this._nextId}));
+  },
+
+  /* ── member CRUD ── */
+  addMember(name) {
+    this.members.push({id: this._nextId++, name: name || 'New Member', rsvp: null});
+    this._saveMembers();
+  },
+  removeMember(id) {
+    this.members = this.members.filter(m => m.id !== id);
+    this._saveMembers();
+  },
+  renameMember(id, name) {
+    const m = this.members.find(m => m.id === id);
+    if (m) { m.name = name.trim() || m.name; this._saveMembers(); }
+  },
   setRsvp(id, val) {
     const m = this.members.find(m => m.id === id);
     if (!m) return;
     m.rsvp = m.rsvp === val ? null : val;
-    const map = {};
-    this.members.forEach(m => { if (m.rsvp) map[m.id] = m.rsvp; });
-    localStorage.setItem('wfg_rsvp', JSON.stringify(map));
+    this._saveMembers();
   },
 
   /* ── checklist ops ── */
@@ -874,21 +899,61 @@ function renderTimeline(){
 
 // ── ROSTER ────────────────────────────────────────
 function initials(n){return n.split(' ').map(w=>w[0]||'').join('').toUpperCase().slice(0,2)||'?'}
+
 function renderRoster(){
   const list=document.getElementById('rosterList');list.innerHTML='';
   DB.members.forEach(m=>{
     const row=document.createElement('div');row.className='member-row';
-    row.innerHTML=`<div class="avatar">${initials(m.name)}</div>
-<span class="m-name">${m.name}</span>
-<div class="rsvp-wrap">
-  <button class="rsvp${m.rsvp==='in'?' in':''}" onclick="setRsvp(${m.id},'in')">In</button>
-  <button class="rsvp${m.rsvp==='out'?' out':''}" onclick="setRsvp(${m.id},'out')">Out</button>
-</div>`;
+    row.innerHTML=`
+      <div class="avatar" id="av-${m.id}">${initials(m.name)}</div>
+      <span class="m-name" id="mn-${m.id}">${m.name}</span>
+      <div class="rsvp-wrap">
+        <button class="rsvp${m.rsvp==='in'?' in':''}" onclick="setRsvp(${m.id},'in')">In</button>
+        <button class="rsvp${m.rsvp==='out'?' out':''}" onclick="setRsvp(${m.id},'out')">Out</button>
+        <button class="rsvp m-edit-btn" onclick="editMember(${m.id})" title="Edit name">✎</button>
+        <button class="rsvp m-del-btn" onclick="deleteMember(${m.id})" title="Remove">✕</button>
+      </div>`;
     list.appendChild(row);
   });
-  document.getElementById('confirmedBar').textContent=DB.members.filter(m=>m.rsvp==='in').length+' of '+DB.members.length+' confirmed for May 2, 2026';
+  document.getElementById('confirmedBar').textContent=
+    DB.members.filter(m=>m.rsvp==='in').length+' of '+DB.members.length+' confirmed for May 2, 2026';
 }
+
 function setRsvp(id,v){DB.setRsvp(id,v);renderRoster();}
+
+function editMember(id){
+  const span=document.getElementById('mn-'+id);
+  if(!span)return;
+  const old=span.textContent;
+  span.contentEditable='true';
+  span.classList.add('m-name-editing');
+  span.focus();
+  document.execCommand('selectAll',false,null);
+  span.onblur=()=>commitEdit(id,span);
+  span.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();span.blur();}if(e.key==='Escape'){span.textContent=old;span.blur();}};
+}
+
+function commitEdit(id,span){
+  span.contentEditable='false';
+  span.classList.remove('m-name-editing');
+  DB.renameMember(id, span.textContent);
+  const av=document.getElementById('av-'+id);
+  if(av) av.textContent=initials(span.textContent);
+}
+
+function deleteMember(id){
+  if(DB.members.length<=1)return;
+  DB.removeMember(id);
+  renderRoster();
+}
+
+function addMember(){
+  DB.addMember('New Member');
+  renderRoster();
+  const rows=document.querySelectorAll('.member-row');
+  const last=rows[rows.length-1];
+  if(last) editMember(DB.members[DB.members.length-1].id);
+}
 
 // ── CHECKLIST ─────────────────────────────────────
 function resetChecklist(){if(!confirm('Reset all checklist items?'))return;DB.resetChecked();renderChecklist();}
