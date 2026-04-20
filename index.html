@@ -631,39 +631,111 @@ body{font-family:'Crimson Pro',Georgia,serif;color:var(--txt);background:var(--s
 </div>
 
 <script>
-// ── DATA ──────────────────────────────────────────
+// ══════════════════════════════════════════
+//  CENTRAL DATA STORE
+// ══════════════════════════════════════════
+const DB = {
+
+  /* ── defaults ── */
+  _defaults: {
+    members: [
+      {id:1,name:'Member 1',rsvp:null},
+      {id:2,name:'Member 2',rsvp:null},
+      {id:3,name:'Member 3',rsvp:null},
+      {id:4,name:'Member 4',rsvp:null},
+    ],
+    categories: [
+      {cat:'Rods & Reels',     items:['Spinning rod','Baitcasting rod','Spare rod','Rod holders','Reel oil']},
+      {cat:'Tackle Box',       items:['Hooks (assorted)','Sinkers','Bobbers','Soft plastic lures','Hard lures','Swivels & snaps','Extra line']},
+      {cat:'Bait & Landing',   items:['Live bait container','Powerbait (trout)','Worms','Landing net','Bait bucket','Stringer']},
+      {cat:'Clothing & Safety',items:['Life jacket','First aid kit','Sun hat','Rain jacket','Sunscreen SPF 50','Polarized sunglasses','Waders']},
+      {cat:'Food & Drinks',    items:['Cooler with ice','Water (2L/person)','Coffee thermos','Snacks','Packed lunch','Trash bags']},
+      {cat:'Licenses & Docs',  items:['PA fishing license (each member)','Regulation booklet','Park/access permit','Emergency contacts']},
+    ],
+  },
+
+  /* ── live state ── */
+  members:    [],
+  categories: [],
+  checked:    {},
+  _nextId:    5,
+
+  /* ── persistence ── */
+  save() {
+    localStorage.setItem('wfg_db', JSON.stringify({
+      members:    this.members,
+      categories: this.categories,
+      checked:    this.checked,
+      _nextId:    this._nextId,
+    }));
+  },
+
+  load() {
+    const raw = localStorage.getItem('wfg_db');
+    if (raw) {
+      const s = JSON.parse(raw);
+      this.members    = s.members    || JSON.parse(JSON.stringify(this._defaults.members));
+      this.categories = s.categories || JSON.parse(JSON.stringify(this._defaults.categories));
+      this.checked    = s.checked    || {};
+      this._nextId    = s._nextId    || 5;
+      return;
+    }
+    // migrate legacy keys if present
+    const lr = localStorage.getItem('wfg_roster');
+    const lc = localStorage.getItem('wfg_checklist');
+    this.members    = lr ? JSON.parse(lr).map((m,i)=>({id:i+1,...m}))
+                        : JSON.parse(JSON.stringify(this._defaults.members));
+    this.categories = JSON.parse(JSON.stringify(this._defaults.categories));
+    this.checked    = lc ? JSON.parse(lc) : {};
+    this._nextId    = this.members.length + 1;
+    this.save();
+    localStorage.removeItem('wfg_roster');
+    localStorage.removeItem('wfg_checklist');
+  },
+
+  /* ── member ops ── */
+  addMember(name) {
+    this.members.push({id:this._nextId++, name:name||'New Member', rsvp:null});
+    this.save();
+  },
+  removeMember(id) {
+    this.members = this.members.filter(m=>m.id!==id);
+    this.save();
+  },
+  updateMember(id, patch) {
+    const m = this.members.find(m=>m.id===id);
+    if (m) { Object.assign(m, patch); this.save(); }
+  },
+
+  /* ── checklist ops ── */
+  setChecked(cat, item, val) {
+    if (val) this.checked[cat+'::'+item] = true;
+    else     delete this.checked[cat+'::'+item];
+    this.save();
+  },
+  resetChecked() { this.checked = {}; this.save(); },
+};
+
+// ── TRIP CONSTANTS ────────────────────────────────
 const TRIP_DATE_STR = '2026-05-02';
 const DEPARTURE = new Date('2026-05-02T05:00:00');
-const HOME = {lat:39.9476, lon:-75.3052};
 const DEST = {lat:41.0026, lon:-75.4327};
 
 const TL_ITEMS = [
-  {t:'5:00 AM', n:'Pre-Dawn Prep',         d:'30 min',     desc:'Gear check, bait, pack cooler & coffee',          h:5,  m:0},
-  {t:'7:00 AM', n:'Depart Drexel Hill',    d:'1 hr 45 min',desc:'~90 miles via I-476 N into the Poconos',           h:7,  m:0},
-  {t:'8:30 AM', n:'Arrive & Setup',        d:'30 min',     desc:'Unload, rods rigged, walk the pond and find spots',h:8,  m:30},
+  {t:'5:00 AM', n:'Pre-Dawn Prep',         d:'30 min',     desc:'Gear check, bait, pack cooler & coffee',           h:5,  m:0},
+  {t:'7:00 AM', n:'Depart Drexel Hill',    d:'1 hr 45 min',desc:'~90 miles via I-476 N into the Poconos',            h:7,  m:0},
+  {t:'8:30 AM', n:'Arrive & Setup',        d:'30 min',     desc:'Unload, rods rigged, walk the pond and find spots', h:8,  m:30},
   {t:'9:00 AM', n:'Morning Session',       d:'2 hrs',      desc:'Prime golden-hour fishing — trout are active early',h:9,  m:0},
-  {t:'11:00 AM',n:'Snacks & Break',        d:'30 min',     desc:'Shore snacks, swap stories, rest the water a bit', h:11, m:0},
-  {t:'11:30 AM',n:'Fishing — Round 2',     d:'1 hr 30 min',desc:'Move spots if needed, keep the pressure on',       h:11, m:30},
-  {t:'1:00 PM', n:'Lunch & Relax',         d:'1 hr',       desc:'Unpack the cooler — no debate on this one',        h:13, m:0},
-  {t:'2:00 PM', n:'Games / Free Play',     d:'1 hr 30 min',desc:'Optional fishing, frisbee, explore the area',      h:14, m:0},
-  {t:'3:30 PM', n:'Final Fishing Round',   d:'1 hr',       desc:'Afternoon bite window — bass pick up in the shade',h:15, m:30},
-  {t:'4:30 PM', n:'Wrap Up & Group Photo', d:'30 min',     desc:'Pack it up, count the haul, mandatory group photo',h:16, m:30},
+  {t:'11:00 AM',n:'Snacks & Break',        d:'30 min',     desc:'Shore snacks, swap stories, rest the water a bit',  h:11, m:0},
+  {t:'11:30 AM',n:'Fishing — Round 2',     d:'1 hr 30 min',desc:'Move spots if needed, keep the pressure on',        h:11, m:30},
+  {t:'1:00 PM', n:'Lunch & Relax',         d:'1 hr',       desc:'Unpack the cooler — no debate on this one',         h:13, m:0},
+  {t:'2:00 PM', n:'Games / Free Play',     d:'1 hr 30 min',desc:'Optional fishing, frisbee, explore the area',       h:14, m:0},
+  {t:'3:30 PM', n:'Final Fishing Round',   d:'1 hr',       desc:'Afternoon bite window — bass pick up in the shade', h:15, m:30},
+  {t:'4:30 PM', n:'Wrap Up & Group Photo', d:'30 min',     desc:'Pack it up, count the haul, mandatory group photo', h:16, m:30},
 ];
 
-const CHECKLIST = [
-  {cat:'Rods & Reels',     items:['Spinning rod','Baitcasting rod','Spare rod','Rod holders','Reel oil']},
-  {cat:'Tackle Box',       items:['Hooks (assorted)','Sinkers','Bobbers','Soft plastic lures','Hard lures','Swivels & snaps','Extra line']},
-  {cat:'Bait & Landing',   items:['Live bait container','Powerbait (trout)','Worms','Landing net','Bait bucket','Stringer']},
-  {cat:'Clothing & Safety',items:['Life jacket','First aid kit','Sun hat','Rain jacket','Sunscreen SPF 50','Polarized sunglasses','Waders']},
-  {cat:'Food & Drinks',    items:['Cooler with ice','Water (2L/person)','Coffee thermos','Snacks','Packed lunch','Trash bags']},
-  {cat:'Licenses & Docs',  items:['PA fishing license (each member)','Regulation booklet','Park/access permit','Emergency contacts']},
-];
-
-let members   = JSON.parse(localStorage.getItem('wfg_roster')||'null') || ['Member 1','Member 2','Member 3','Member 4'].map(n=>({name:n,rsvp:null}));
-let checkState= JSON.parse(localStorage.getItem('wfg_checklist')||'{}');
-let clOpen    = {}; CHECKLIST.forEach(c=>clOpen[c.cat]=true);
+let clOpen    = {};
 let rtFetched = false;
-
 const p2 = n => String(n).padStart(2,'0');
 
 // ── CLOCK ─────────────────────────────────────────
@@ -826,37 +898,37 @@ function renderTimeline(){
 }
 
 // ── ROSTER ────────────────────────────────────────
-function saveRoster(){localStorage.setItem('wfg_roster',JSON.stringify(members));}
 function initials(n){return n.split(' ').map(w=>w[0]||'').join('').toUpperCase().slice(0,2)||'?'}
 function renderRoster(){
   const list=document.getElementById('rosterList');list.innerHTML='';
-  members.forEach((m,i)=>{
+  DB.members.forEach(m=>{
     const row=document.createElement('div');row.className='member-row';
     row.innerHTML=`<div class="avatar">${initials(m.name)}</div>
-<span class="m-name" contenteditable="true" onblur="renameMember(${i},this.textContent)">${m.name}</span>
+<span class="m-name" contenteditable="true" onblur="renameMember(${m.id},this.textContent)">${m.name}</span>
 <div class="rsvp-wrap">
-  <button class="rsvp${m.rsvp==='in'?' in':''}" onclick="setRsvp(${i},'in')">In</button>
-  <button class="rsvp${m.rsvp==='out'?' out':''}" onclick="setRsvp(${i},'out')">Out</button>
+  <button class="rsvp${m.rsvp==='in'?' in':''}" onclick="setRsvp(${m.id},'in')">In</button>
+  <button class="rsvp${m.rsvp==='out'?' out':''}" onclick="setRsvp(${m.id},'out')">Out</button>
+  <button class="rsvp" style="padding:5px 8px;color:#c03030;border-color:rgba(180,40,40,.35)" onclick="removeMember(${m.id})" title="Remove">✕</button>
 </div>`;
     list.appendChild(row);
   });
-  document.getElementById('confirmedBar').textContent=members.filter(m=>m.rsvp==='in').length+' of '+members.length+' confirmed for May 2, 2026';
+  document.getElementById('confirmedBar').textContent=DB.members.filter(m=>m.rsvp==='in').length+' of '+DB.members.length+' confirmed for May 2, 2026';
 }
-function setRsvp(i,v){members[i].rsvp=members[i].rsvp===v?null:v;saveRoster();renderRoster();}
-function renameMember(i,n){members[i].name=n.trim()||'Member '+(i+1);saveRoster();renderRoster();}
+function setRsvp(id,v){const m=DB.members.find(m=>m.id===id);if(m)DB.updateMember(id,{rsvp:m.rsvp===v?null:v});renderRoster();}
+function renameMember(id,n){DB.updateMember(id,{name:n.trim()||'Member'});renderRoster();}
+function removeMember(id){if(DB.members.length<=1)return;DB.removeMember(id);renderRoster();}
 function addMember(){
-  members.push({name:'New Member',rsvp:null});saveRoster();renderRoster();
+  DB.addMember('New Member');renderRoster();
   const rows=document.querySelectorAll('.member-row');
   const sp=rows[rows.length-1].querySelector('.m-name');
   sp.focus();document.execCommand('selectAll',false,null);
 }
 
 // ── CHECKLIST ─────────────────────────────────────
-function saveChecklist(){localStorage.setItem('wfg_checklist',JSON.stringify(checkState));}
-function resetChecklist(){if(!confirm('Reset all checklist items?'))return;checkState={};saveChecklist();renderChecklist();}
+function resetChecklist(){if(!confirm('Reset all checklist items?'))return;DB.resetChecked();renderChecklist();}
 function updateProgress(){
   let total=0,checked=0;
-  CHECKLIST.forEach(cat=>cat.items.forEach(item=>{total++;if(checkState[cat.cat+'::'+item])checked++;}));
+  DB.categories.forEach(cat=>cat.items.forEach(item=>{total++;if(DB.checked[cat.cat+'::'+item])checked++;}));
   const pct=total?Math.round(checked/total*100):0;
   document.getElementById('progLabel').textContent=checked+' of '+total+' items packed';
   document.getElementById('progPct').textContent=pct+'%';
@@ -864,9 +936,10 @@ function updateProgress(){
 }
 function renderChecklist(){
   const el=document.getElementById('checklistEl');el.innerHTML='';
-  CHECKLIST.forEach(cat=>{
+  DB.categories.forEach(cat=>{
+    if(!clOpen.hasOwnProperty(cat.cat)) clOpen[cat.cat]=true;
     const sec=document.createElement('div');sec.className='cl-section';
-    const done=cat.items.filter(i=>checkState[cat.cat+'::'+i]).length;
+    const done=cat.items.filter(i=>DB.checked[cat.cat+'::'+i]).length;
     const head=document.createElement('div');head.className='cl-head';
     head.innerHTML=`<span>${cat.cat}</span><span class="cl-head-r"><span>${done}/${cat.items.length}</span><span class="chevron">${clOpen[cat.cat]?'▲':'▼'}</span></span>`;
     head.onclick=()=>{clOpen[cat.cat]=!clOpen[cat.cat];renderChecklist();};
@@ -875,14 +948,13 @@ function renderChecklist(){
       const body=document.createElement('div');body.className='cl-body';
       cat.items.forEach(item=>{
         const key=cat.cat+'::'+item;
-        const row=document.createElement('label');row.className='cl-item'+(checkState[key]?' done':'');
-        row.innerHTML=`<input type="checkbox"${checkState[key]?' checked':''}/> ${item}`;
+        const row=document.createElement('label');row.className='cl-item'+(DB.checked[key]?' done':'');
+        row.innerHTML=`<input type="checkbox"${DB.checked[key]?' checked':''}/> ${item}`;
         row.querySelector('input').onchange=e=>{
-          checkState[key]=e.target.checked;saveChecklist();
+          DB.setChecked(cat.cat, item, e.target.checked);
           row.className='cl-item'+(e.target.checked?' done':'');
           updateProgress();
-          const hdr=head.querySelector('.cl-head-r span');
-          hdr.textContent=cat.items.filter(i=>checkState[cat.cat+'::'+i]).length+'/'+cat.items.length;
+          head.querySelector('.cl-head-r span').textContent=cat.items.filter(i=>DB.checked[cat.cat+'::'+i]).length+'/'+cat.items.length;
         };
         body.appendChild(row);
       });
@@ -934,6 +1006,7 @@ async function pullRtWx(){
 
 // ── INIT ──────────────────────────────────────────
 document.addEventListener('DOMContentLoaded',()=>{
+  DB.load();
   initClock();
   initCountdown();
   renderTimeline();
