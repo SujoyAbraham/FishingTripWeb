@@ -1072,14 +1072,6 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   loadWeather();
   setInterval(loadWeather, 600000);
   setInterval(renderTimeline, 60000);
-  /* poll cloud every 30s so all devices see updates */
-  if (Cloud.ready) setInterval(async ()=>{
-    const remote = await Cloud.pull();
-    if (!remote || !remote.members) return;
-    DB._apply(remote);
-    localStorage.setItem('wfg_db', JSON.stringify(DB._snapshot()));
-    renderRoster(); renderChecklist(); syncBadge('saved');
-  }, 30000);
 });
 </script>
 </body>
