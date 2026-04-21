@@ -525,7 +525,14 @@ body{font-family:'Crimson Pro',Georgia,serif;color:var(--txt);background:var(--s
         </div>
       </div>
       <div class="card card-pad">
-        <div class="label-sm" style="margin-bottom:8px">Trip-Day Conditions · Effort, PA · May 2, 2026 (noon)</div>
+        <div class="label-sm" style="margin-bottom:6px">Right Now · Effort, PA</div>
+        <div class="wx-grid" style="margin-bottom:14px">
+          <div class="wx-card"><div class="wx-val" id="wxNowTemp">--</div><div class="wx-lbl">Temp °F</div></div>
+          <div class="wx-card"><div class="wx-val" id="wxNowWind">--</div><div class="wx-lbl">Wind mph</div></div>
+          <div class="wx-card"><div class="wx-val" id="wxNowCloud">--</div><div class="wx-lbl">Cloud %</div></div>
+          <div class="wx-card"><div class="wx-val" id="wxNowRain">--</div><div class="wx-lbl">Rain %</div></div>
+        </div>
+        <div class="label-sm" style="margin-bottom:8px">May 2, 2026 · Noon Forecast</div>
         <div id="condBadge" class="cond-badge cond-good"><div class="cond-dot"></div><span id="condText">Loading…</span></div>
         <div class="wx-grid">
           <div class="wx-card"><div class="wx-val" id="wxTemp">--</div><div class="wx-lbl">Temp °F</div></div>
@@ -614,10 +621,10 @@ body{font-family:'Crimson Pro',Georgia,serif;color:var(--txt);background:var(--s
         <span id="fcDateMsg">Checking forecast availability for May 2, 2026…</span>
       </div>
       <div class="fc-grid">
-        <div class="fc-card"><div class="fc-val" id="fcTemp">--<span class="fc-unit">°F</span></div><div class="fc-lbl">Morning Temp (6AM)</div></div>
-        <div class="fc-card"><div class="fc-val" id="fcWind">--<span class="fc-unit">mph</span></div><div class="fc-lbl">Avg Wind 6AM–4PM</div></div>
-        <div class="fc-card"><div class="fc-val" id="fcCloud">--<span class="fc-unit">%</span></div><div class="fc-lbl">Cloud Cover Avg</div></div>
-        <div class="fc-card"><div class="fc-val" id="fcRain">--<span class="fc-unit">%</span></div><div class="fc-lbl">Rain Chance Max</div></div>
+        <div class="fc-card"><div class="fc-val" id="fcTemp">--<span class="fc-unit">°F</span></div><div class="fc-lbl">Noon Temp</div></div>
+        <div class="fc-card"><div class="fc-val" id="fcWind">--<span class="fc-unit">mph</span></div><div class="fc-lbl">Noon Wind</div></div>
+        <div class="fc-card"><div class="fc-val" id="fcCloud">--<span class="fc-unit">%</span></div><div class="fc-lbl">Noon Cloud %</div></div>
+        <div class="fc-card"><div class="fc-val" id="fcRain">--<span class="fc-unit">%</span></div><div class="fc-lbl">Noon Rain %</div></div>
       </div>
       <div class="label-sm">Hourly Temperature · 5 AM – 6 PM</div>
       <div class="bar-chart" id="barChart"><div style="color:var(--txt3);font-family:'DM Mono',monospace;font-size:.78rem">Fetching…</div></div>
@@ -898,6 +905,15 @@ async function loadWeather(){
   if(!data){document.getElementById('wxUpdated').textContent='Weather unavailable';return;}
 
   const times=data.hourly.time;
+
+  // Current conditions (right now)
+  const nowIdx=getCurrentHourIdx(data);
+  document.getElementById('wxNowTemp').textContent=Math.round(data.hourly.temperature_2m[nowIdx]);
+  document.getElementById('wxNowWind').textContent=Math.round(data.hourly.windspeed_10m[nowIdx]);
+  document.getElementById('wxNowCloud').textContent=Math.round(data.hourly.cloudcover[nowIdx]);
+  document.getElementById('wxNowRain').textContent=Math.round(data.hourly.precipitation_probability[nowIdx]);
+
+  // May 2 noon forecast
   const noonIdx=times.findIndex(t=>t.startsWith(TRIP_DATE_STR+'T12:00'));
   const idx=noonIdx>=0?noonIdx:getCurrentHourIdx(data);
   const isExact=noonIdx>=0;
@@ -970,12 +986,12 @@ async function loadWeather(){
   document.getElementById('bestWindowTxt').textContent='Best Window: '+bwHrs[bestIdx]+' – '+bwHrs[Math.min(bestIdx+2,13)]+' · wind '+Math.round(winds14[bestIdx])+'mph, cloud '+Math.round(clouds14[bestIdx])+'%';
   document.getElementById('bestWindow').style.display='flex';
 
-  document.getElementById('fcTemp').innerHTML=Math.round(temps14[1])+'<span class="fc-unit">°F</span>';
-  const avgW=Math.round(winds14.slice(1,11).reduce((a,b)=>a+b,0)/10);
-  document.getElementById('fcWind').innerHTML=avgW+'<span class="fc-unit">mph</span>';
-  const avgC=Math.round(clouds14.slice(1,11).reduce((a,b)=>a+b,0)/10);
-  document.getElementById('fcCloud').innerHTML=avgC+'<span class="fc-unit">%</span>';
-  document.getElementById('fcRain').innerHTML=Math.round(Math.max(...rains14))+'<span class="fc-unit">%</span>';
+  // All 4 forecast cards use noon values (index 7 = 12PM in the 5AM-based hrs14 array)
+  const noonOff=7;
+  document.getElementById('fcTemp').innerHTML=Math.round(temps14[noonOff])+'<span class="fc-unit">°F</span>';
+  document.getElementById('fcWind').innerHTML=Math.round(winds14[noonOff])+'<span class="fc-unit">mph</span>';
+  document.getElementById('fcCloud').innerHTML=Math.round(clouds14[noonOff])+'<span class="fc-unit">%</span>';
+  document.getElementById('fcRain').innerHTML=Math.round(rains14[noonOff])+'<span class="fc-unit">%</span>';
 
   const ts=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
   document.getElementById('fcUpdated').textContent=(startIdx>=0?'Forecast for May 2, 2026':'Current conditions (May 2 not yet in range)')+' · Updated '+ts;
