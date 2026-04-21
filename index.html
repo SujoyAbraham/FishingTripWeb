@@ -352,6 +352,11 @@ body{font-family:'Crimson Pro',Georgia,serif;color:var(--txt);background:var(--s
 }
 .bring-icon{font-size:1.1rem;flex-shrink:0}
 @media(max-width:520px){.bring-grid{grid-template-columns:1fr 1fr}}
+.rules-list{list-style:none}
+.rules-item{display:flex;align-items:flex-start;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)}
+.rules-item:last-child{border:none}
+.rules-emoji{font-size:1.2rem;flex-shrink:0;margin-top:1px}
+.rules-text{font-size:.92rem;color:var(--txt);line-height:1.5}
 
 /* ══════════════════════════════════════════
    REAL-TIME WEATHER WIDGET (floating)
@@ -673,6 +678,25 @@ body{font-family:'Crimson Pro',Georgia,serif;color:var(--txt);background:var(--s
         <div class="bring-item"><span class="bring-icon">📱</span> Charged Phone</div>
         <div class="bring-item"><span class="bring-icon">🗑️</span> Trash Bag</div>
       </div>
+    </div>
+  </div>
+
+  <!-- 07 · GROUP RULES -->
+  <div class="section fade-in">
+    <div class="sec-header">
+      <span class="sec-num">07</span>
+      <h2 class="sec-title">Group Rules &amp; Reminders</h2>
+      <div class="sec-line"></div>
+    </div>
+    <div class="card card-pad">
+      <ul class="rules-list">
+        <li class="rules-item"><span class="rules-emoji">🐟</span><span class="rules-text">Catch &amp; release unless you plan to eat it — keep the lake healthy!</span></li>
+        <li class="rules-item"><span class="rules-emoji">🗑️</span><span class="rules-text">Pack it in, pack it out — leave no trace behind</span></li>
+        <li class="rules-item"><span class="rules-emoji">🔇</span><span class="rules-text">Keep it chill — no loud music that scares the fish (or the neighbors)</span></li>
+        <li class="rules-item"><span class="rules-emoji">🤝</span><span class="rules-text">Help each other out — share tips, bait, and good vibes</span></li>
+        <li class="rules-item"><span class="rules-emoji">🏆</span><span class="rules-text">Biggest catch = bragging rights + gets to pick next trip spot</span></li>
+        <li class="rules-item"><span class="rules-emoji">⚠️</span><span class="rules-text">Check PA fishing regulations — make sure your license is current!</span></li>
+      </ul>
     </div>
   </div>
 
