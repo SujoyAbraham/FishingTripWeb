@@ -342,31 +342,16 @@ body{font-family:'Crimson Pro',Georgia,serif;color:var(--txt);background:var(--s
 .rate-source a:hover{text-decoration:underline}
 
 /* ══════════════════════════════════════════
-   CHECKLIST
+   BRING LIST
 ══════════════════════════════════════════ */
-.progress-top{margin-bottom:14px}
-.prog-labels{display:flex;justify-content:space-between;font-family:'DM Mono',monospace;font-size:.72rem;color:var(--txt2);margin-bottom:5px}
-.prog-track{background:var(--b1);border-radius:4px;height:6px;overflow:hidden;border:1px solid var(--b2)}
-.prog-fill{height:100%;border-radius:4px;background:linear-gradient(90deg,var(--b3),var(--a4));transition:width .4s}
-.cl-section{margin-bottom:8px}
-.cl-head{
-  display:flex;align-items:center;justify-content:space-between;
-  padding:9px 14px;background:var(--b1);border:1px solid var(--b2);
-  border-radius:8px;cursor:pointer;font-size:.88rem;font-weight:600;color:var(--txt);
-  transition:background .15s;
-}
-.cl-head:hover{background:var(--sky2)}
-.cl-head-r{display:flex;align-items:center;gap:8px;font-family:'DM Mono',monospace;font-size:.68rem;color:var(--txt3)}
-.chevron{display:inline-block;transition:transform .2s;font-size:.75rem}
-.cl-body{padding:6px 4px}
-.cl-item{
+.bring-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px}
+.bring-item{
+  background:var(--b1);border:1px solid var(--b2);border-radius:10px;
+  padding:10px 13px;font-size:.88rem;font-weight:600;color:var(--txt);
   display:flex;align-items:center;gap:8px;
-  padding:5px 10px;border-radius:6px;cursor:pointer;
-  font-size:.88rem;color:var(--txt);transition:background .1s;
 }
-.cl-item:hover{background:var(--mist2)}
-.cl-item input[type=checkbox]{accent-color:var(--b4);width:14px;height:14px;cursor:pointer;flex-shrink:0}
-.cl-item.done{color:var(--txt3);text-decoration:line-through}
+.bring-icon{font-size:1.1rem;flex-shrink:0}
+@media(max-width:520px){.bring-grid{grid-template-columns:1fr 1fr}}
 
 /* ══════════════════════════════════════════
    REAL-TIME WEATHER WIDGET (floating)
@@ -668,14 +653,26 @@ body{font-family:'Crimson Pro',Georgia,serif;color:var(--txt);background:var(--s
       <span class="sec-num">06</span>
       <h2 class="sec-title">Pack Your Bag</h2>
       <div class="sec-line"></div>
-      <button class="clear-btn" onclick="resetChecklist()">Reset All</button>
     </div>
     <div class="card card-pad">
-      <div class="progress-top">
-        <div class="prog-labels"><span id="progLabel">0 of 0 items packed</span><span id="progPct">0%</span></div>
-        <div class="prog-track"><div class="prog-fill" id="progFill" style="width:0%"></div></div>
+      <div class="bring-grid">
+        <div class="bring-item"><span class="bring-icon">🎣</span> Rod &amp; Reel</div>
+        <div class="bring-item"><span class="bring-icon">🪱</span> Bait &amp; Lures</div>
+        <div class="bring-item"><span class="bring-icon">🪣</span> Tackle Box</div>
+        <div class="bring-item"><span class="bring-icon">🪝</span> Extra Hooks</div>
+        <div class="bring-item"><span class="bring-icon">🪪</span> Fishing License</div>
+        <div class="bring-item"><span class="bring-icon">🧤</span> Gloves</div>
+        <div class="bring-item"><span class="bring-icon">☀️</span> Sunscreen</div>
+        <div class="bring-item"><span class="bring-icon">🧢</span> Hat / Cap</div>
+        <div class="bring-item"><span class="bring-icon">🥤</span> Water Bottle</div>
+        <div class="bring-item"><span class="bring-icon">🥪</span> Snacks &amp; Lunch</div>
+        <div class="bring-item"><span class="bring-icon">🪑</span> Folding Chair</div>
+        <div class="bring-item"><span class="bring-icon">🩹</span> First Aid Kit</div>
+        <div class="bring-item"><span class="bring-icon">🦟</span> Bug Spray</div>
+        <div class="bring-item"><span class="bring-icon">🔦</span> Flashlight</div>
+        <div class="bring-item"><span class="bring-icon">📱</span> Charged Phone</div>
+        <div class="bring-item"><span class="bring-icon">🗑️</span> Trash Bag</div>
       </div>
-      <div id="checklistEl"></div>
     </div>
   </div>
 
@@ -775,14 +772,6 @@ function syncBadge(state) {
 // ══════════════════════════════════════════
 const DB = {
 
-  _defaultCategories: [
-    {cat:'Rods & Reels',     items:['Spinning rod','Baitcasting rod','Spare rod','Rod holders','Reel oil']},
-    {cat:'Tackle Box',       items:['Hooks (assorted)','Sinkers','Bobbers','Soft plastic lures','Hard lures','Swivels & snaps','Extra line']},
-    {cat:'Bait & Landing',   items:['Live bait container','Powerbait (trout)','Worms','Landing net','Bait bucket','Stringer']},
-    {cat:'Clothing & Safety',items:['Life jacket','First aid kit','Sun hat','Rain jacket','Sunscreen SPF 50','Polarized sunglasses','Waders']},
-    {cat:'Food & Drinks',    items:['Cooler with ice','Water (2L/person)','Coffee thermos','Snacks','Packed lunch','Trash bags']},
-    {cat:'Licenses & Docs',  items:['PA fishing license (each member)','Regulation booklet','Park/access permit','Emergency contacts']},
-  ],
   _defaultMembers: [
     {id:1,name:'Member 1',rsvp:null,pax:1},
     {id:2,name:'Member 2',rsvp:null,pax:1},
@@ -790,15 +779,14 @@ const DB = {
     {id:4,name:'Member 4',rsvp:null,pax:1},
   ],
 
-  members: [], categories: [], checked: {}, _nextId: 5,
+  members: [], _nextId: 5,
 
   _snapshot() {
-    return {members:this.members, checked:this.checked, _nextId:this._nextId};
+    return {members:this.members, _nextId:this._nextId};
   },
 
   _apply(data) {
     this.members  = (data && data.members)  || JSON.parse(JSON.stringify(this._defaultMembers));
-    this.checked  = (data && data.checked)  || {};
     this._nextId  = (data && data._nextId)  || this.members.length + 1;
   },
 
@@ -809,7 +797,6 @@ const DB = {
   },
 
   async load() {
-    this.categories = this._defaultCategories;
     if (Cloud.ready) {
       syncBadge('loading');
       const remote = await Cloud.pull();
@@ -832,9 +819,6 @@ const DB = {
   setRsvp(id, val)      { const m=this.members.find(m=>m.id===id); if(!m)return; m.rsvp=m.rsvp===val?null:val; this.save(); },
   setPax(id, val)       { const m=this.members.find(m=>m.id===id); if(!m)return; m.pax=Math.max(1,val); this.save(); },
 
-  /* ── checklist ops ── */
-  setChecked(cat, item, val) { if(val) this.checked[cat+'::'+item]=true; else delete this.checked[cat+'::'+item]; this.save(); },
-  resetChecked()             { this.checked={}; this.save(); },
 };
 
 // ── TRIP CONSTANTS ────────────────────────────────
@@ -855,7 +839,6 @@ const TL_ITEMS = [
   {t:'4:30 PM', n:'Wrap Up & Group Photo', d:'30 min',     desc:'Pack it up, count the haul, mandatory group photo', h:16, m:30},
 ];
 
-let clOpen    = {};
 let rtFetched = false;
 const p2 = n => String(n).padStart(2,'0');
 
@@ -1089,47 +1072,6 @@ function addMember(){
   editMember(DB.members[DB.members.length-1].id);
 }
 
-// ── CHECKLIST ─────────────────────────────────────
-function resetChecklist(){if(!confirm('Reset all checklist items?'))return;DB.resetChecked();renderChecklist();}
-function updateProgress(){
-  let total=0,checked=0;
-  DB.categories.forEach(cat=>cat.items.forEach(item=>{total++;if(DB.checked[cat.cat+'::'+item])checked++;}));
-  const pct=total?Math.round(checked/total*100):0;
-  document.getElementById('progLabel').textContent=checked+' of '+total+' items packed';
-  document.getElementById('progPct').textContent=pct+'%';
-  document.getElementById('progFill').style.width=pct+'%';
-}
-function renderChecklist(){
-  const el=document.getElementById('checklistEl');el.innerHTML='';
-  DB.categories.forEach(cat=>{
-    if(!clOpen.hasOwnProperty(cat.cat)) clOpen[cat.cat]=true;
-    const sec=document.createElement('div');sec.className='cl-section';
-    const done=cat.items.filter(i=>DB.checked[cat.cat+'::'+i]).length;
-    const head=document.createElement('div');head.className='cl-head';
-    head.innerHTML=`<span>${cat.cat}</span><span class="cl-head-r"><span>${done}/${cat.items.length}</span><span class="chevron">${clOpen[cat.cat]?'▲':'▼'}</span></span>`;
-    head.onclick=()=>{clOpen[cat.cat]=!clOpen[cat.cat];renderChecklist();};
-    sec.appendChild(head);
-    if(clOpen[cat.cat]){
-      const body=document.createElement('div');body.className='cl-body';
-      cat.items.forEach(item=>{
-        const key=cat.cat+'::'+item;
-        const row=document.createElement('label');row.className='cl-item'+(DB.checked[key]?' done':'');
-        row.innerHTML=`<input type="checkbox"${DB.checked[key]?' checked':''}/> ${item}`;
-        row.querySelector('input').onchange=e=>{
-          DB.setChecked(cat.cat, item, e.target.checked);
-          row.className='cl-item'+(e.target.checked?' done':'');
-          updateProgress();
-          head.querySelector('.cl-head-r span').textContent=cat.items.filter(i=>DB.checked[cat.cat+'::'+i]).length+'/'+cat.items.length;
-        };
-        body.appendChild(row);
-      });
-      sec.appendChild(body);
-    }
-    el.appendChild(sec);
-  });
-  updateProgress();
-}
-
 // ── WATER TYPE ────────────────────────────────────
 function setWater(btn){
   document.querySelectorAll('#waterTypes .toggle-btn').forEach(b=>b.classList.remove('active'));
@@ -1176,7 +1118,6 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   initCountdown();
   renderTimeline();
   renderRoster();
-  renderChecklist();
   loadWeather();
   setInterval(loadWeather, 600000);
   setInterval(renderTimeline, 60000);
