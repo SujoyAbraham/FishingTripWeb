@@ -292,6 +292,11 @@ body{font-family:'Crimson Pro',Georgia,serif;color:var(--txt);background:var(--s
 .m-name{flex:1;font-size:.9rem;color:var(--txt);cursor:pointer;border-bottom:1px dashed transparent}
 .m-name:hover{border-color:var(--border2)}
 .m-name:focus{outline:none;border-color:var(--b3);color:var(--b4)}
+.pax-wrap{display:flex;align-items:center;gap:4px;margin-right:4px}
+.pax-btn{width:20px;height:20px;border-radius:50%;border:1px solid var(--b3);background:transparent;color:var(--b4);font-size:.75rem;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;transition:background .15s}
+.pax-btn:hover{background:var(--b4);color:#fff}
+.pax-count{min-width:18px;text-align:center;font-size:.75rem;font-weight:700;color:var(--b4);font-family:'DM Mono',monospace}
+.pax-label{font-size:.68rem;color:var(--txt3);white-space:nowrap}
 .rsvp-wrap{display:flex;gap:6px}
 .rsvp{
   padding:5px 11px;border-radius:7px;font-size:.75rem;font-weight:600;
@@ -706,10 +711,10 @@ const DB = {
     {cat:'Licenses & Docs',  items:['PA fishing license (each member)','Regulation booklet','Park/access permit','Emergency contacts']},
   ],
   _defaultMembers: [
-    {id:1,name:'Member 1',rsvp:null},
-    {id:2,name:'Member 2',rsvp:null},
-    {id:3,name:'Member 3',rsvp:null},
-    {id:4,name:'Member 4',rsvp:null},
+    {id:1,name:'Member 1',rsvp:null,pax:1},
+    {id:2,name:'Member 2',rsvp:null,pax:1},
+    {id:3,name:'Member 3',rsvp:null,pax:1},
+    {id:4,name:'Member 4',rsvp:null,pax:1},
   ],
 
   members: [], categories: [], checked: {}, _nextId: 5,
@@ -748,10 +753,11 @@ const DB = {
   },
 
   /* ── member CRUD ── */
-  addMember(name)       { this.members.push({id:this._nextId++, name:name||'New Member', rsvp:null}); this.save(); },
+  addMember(name)       { this.members.push({id:this._nextId++, name:name||'New Member', rsvp:null, pax:1}); this.save(); },
   removeMember(id)      { this.members = this.members.filter(m=>m.id!==id); this.save(); },
   renameMember(id, name){ const m=this.members.find(m=>m.id===id); if(m){m.name=name.trim()||m.name; this.save();} },
   setRsvp(id, val)      { const m=this.members.find(m=>m.id===id); if(!m)return; m.rsvp=m.rsvp===val?null:val; this.save(); },
+  setPax(id, val)       { const m=this.members.find(m=>m.id===id); if(!m)return; m.pax=Math.max(1,val); this.save(); },
 
   /* ── checklist ops ── */
   setChecked(cat, item, val) { if(val) this.checked[cat+'::'+item]=true; else delete this.checked[cat+'::'+item]; this.save(); },
@@ -946,9 +952,16 @@ function renderRoster(){
   const list=document.getElementById('rosterList');list.innerHTML='';
   DB.members.forEach(m=>{
     const row=document.createElement('div');row.className='member-row';
+    const pax = m.pax||1;
     row.innerHTML=`
       <div class="avatar" id="av-${m.id}">${initials(m.name)}</div>
       <span class="m-name" id="mn-${m.id}">${m.name}</span>
+      <div class="pax-wrap" title="Number of people">
+        <button class="pax-btn" onclick="changePax(${m.id},-1)">−</button>
+        <span class="pax-count" id="px-${m.id}">${pax}</span>
+        <button class="pax-btn" onclick="changePax(${m.id},1)">+</button>
+        <span class="pax-label">ppl</span>
+      </div>
       <div class="rsvp-wrap">
         <button class="rsvp${m.rsvp==='in'?' in':''}" onclick="setRsvp(${m.id},'in')">In</button>
         <button class="rsvp${m.rsvp==='out'?' out':''}" onclick="setRsvp(${m.id},'out')">Out</button>
@@ -957,11 +970,22 @@ function renderRoster(){
       </div>`;
     list.appendChild(row);
   });
+  const inMembers = DB.members.filter(m=>m.rsvp==='in');
+  const totalPax  = inMembers.reduce((s,m)=>s+(m.pax||1),0);
   document.getElementById('confirmedBar').textContent=
-    DB.members.filter(m=>m.rsvp==='in').length+' of '+DB.members.length+' confirmed for May 2, 2026';
+    inMembers.length+' of '+DB.members.length+' confirmed · '+totalPax+' total people · May 2, 2026';
 }
 
 function setRsvp(id,v){DB.setRsvp(id,v);renderRoster();}
+function changePax(id,delta){
+  const m=DB.members.find(m=>m.id===id);if(!m)return;
+  DB.setPax(id,(m.pax||1)+delta);
+  const el=document.getElementById('px-'+id);if(el)el.textContent=m.pax;
+  const inMembers=DB.members.filter(m=>m.rsvp==='in');
+  const totalPax=inMembers.reduce((s,m)=>s+(m.pax||1),0);
+  document.getElementById('confirmedBar').textContent=
+    inMembers.length+' of '+DB.members.length+' confirmed · '+totalPax+' total people · May 2, 2026';
+}
 
 function editMember(id){
   const span=document.getElementById('mn-'+id);
