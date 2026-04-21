@@ -658,16 +658,18 @@ const Cloud = {
     if (!this.ready) return null;
     try {
       const r = await fetch(this._url()+'/latest', {headers: this._hdrs()});
-      return r.ok ? (await r.json()).record : null;
-    } catch { return null; }
+      if (!r.ok) { console.error('JSONBin pull failed:', r.status, await r.text()); return null; }
+      return (await r.json()).record;
+    } catch(e) { console.error('JSONBin pull error:', e); return null; }
   },
 
   async push(data) {
     if (!this.ready) return;
     try {
-      await fetch(this._url(), {method:'PUT', headers:this._hdrs(), body:JSON.stringify(data)});
+      const r = await fetch(this._url(), {method:'PUT', headers:this._hdrs(), body:JSON.stringify(data)});
+      if (!r.ok) { console.error('JSONBin push failed:', r.status, await r.text()); syncBadge('error'); return; }
       syncBadge('saved');
-    } catch { syncBadge('error'); }
+    } catch(e) { console.error('JSONBin push error:', e); syncBadge('error'); }
   },
 
   schedule(data) {
